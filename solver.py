@@ -30,7 +30,7 @@ DD_TAGS = "https://js.datadome.co/tags.js"
 
 PROXY_URL = os.environ.get(
     "PROXY",
-    "http://f449f4fbe7363deaf4eb:932a7acd4c6e38b8@gw.dataimpulse.com:823"
+    "http://f449f4fbe7363deaf4eb:932a7acd4c6e38b8@74.81.81.81:823"
 )
 
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
@@ -295,8 +295,9 @@ class DataDomeSolver:
             "sameSite": c.get("samesite", "None"),
         }
 
-    def solve_ch(self, cid: str = "null") -> Optional[Dict[str, Any]]:
+    def solve_ch(self, cid: str = "null", request_path: str = None) -> Optional[Dict[str, Any]]:
         js_data = self._build_js_data()
+        path = request_path or self.request_path
         headers = {
             "Content-Type": "application/x-www-form-urlencoded",
             "Host": "api-js.datadome.co",
@@ -317,7 +318,7 @@ class DataDomeSolver:
             "eventCounters": [],
             "jsType": "ch",
             "ddk": self._ddk,
-            "request": self.request_path,
+            "request": path,
             "responsePage": "origin",
             "cid": cid,
             "Referer": self.target_url,
@@ -328,8 +329,9 @@ class DataDomeSolver:
             return None
         return self._parse_cookie(resp.get("cookie", ""), self.site_domain)
 
-    def solve_le(self, cid: str) -> Optional[Dict[str, Any]]:
+    def solve_le(self, cid: str, request_path: str = None) -> Optional[Dict[str, Any]]:
         js_data, event_counters = self._build_le_js_data()
+        path = request_path or self.request_path
         headers = {
             "Content-Type": "application/x-www-form-urlencoded",
             "Host": "api-js.datadome.co",
@@ -361,15 +363,17 @@ class DataDomeSolver:
             return None
         return self._parse_cookie(resp.get("cookie", ""), self.site_domain)
 
-    def solve(self, response_body: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def solve(self, response_body: Optional[str] = None, embed_path: str = None) -> Optional[Dict[str, Any]]:
         """
-        Full DataDome solve: CH cookie + LE cookie.
+        Full DataDome solve — tries pure HTTP first, falls back to browser for API endpoints.
+        
+        Strategy:
+        1. Pure HTTP CH + LE (works for main page, tokenize)
+        2. If that fails on submit (jspl required), use Zendriver browser fallback
         
         Args:
-            response_body: Optional 403 response HTML for challenge extraction.
-        
-        Returns:
-            Cookie dict with {name, value, domain, path, expires, secure, sameSite}
+            response_body: Optional 403 HTML for challenge extraction
+            embed_path: Optional embed page path for LE targeting
         """
         if not self._ddk:
             return None
@@ -379,9 +383,39 @@ class DataDomeSolver:
             return None
 
         time.sleep(random.uniform(0.3, 0.8))
+        cid = ch["value"][:40]
 
-        le = self.solve_le(ch["value"][:40])
-        return le if le else ch
+        le_main = self.solve_le(cid)
+        final = le_main if le_main else ch
+
+        if embed_path:
+            cid = final["value"][:40]
+            time.sleep(random.uniform(0.2, 0.5))
+            le_embed = self.solve_le(cid, embed_path)
+            if le_embed:
+                final = le_embed
+
+        return final
+
+    def solve_browser_fallback(self) -> Optional[Dict[str, Any]]:
+        try:
+            from browser_capture import harvest_session
+            import json
+            sessions_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "sessions")
+            filepath = harvest_session(self.target_url, sessions_dir, self._proxy)
+            if not filepath:
+                return None
+            with open(filepath, "r") as f:
+                state = json.load(f)
+            dd = next((c for c in state.get("cookies", []) if c["name"] == "datadome"), None)
+            php = next((c["value"] for c in state.get("cookies", []) if c["name"] == "PHPSESSID"), None)
+            if dd:
+                return {"name":"datadome","value":dd["value"],"phpsessid":php,"domain":self.site_domain,"path":"/","expires":-1,"httpOnly":False,"secure":True,"sameSite":"None"}
+        except ImportError:
+            pass
+        except Exception as e:
+            print(f"[solver] Browser fallback failed: {e}")
+        return None
 
 
 def solve(target_url: str, ddk: str = None, proxy: str = None) -> Optional[Dict[str, Any]]:

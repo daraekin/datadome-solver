@@ -1,69 +1,64 @@
-# Generic DataDome Bypass (HTTP-only, no browser)
+# Generic DataDome Bypass (Python, open source)
 
 Pure Python DataDome cookie generator — works on **any** DataDome-protected website.
 
-Posts realistic Chrome browser fingerprints to `api-js.datadome.co/js/` using `curl_cffi` TLS impersonation. No browser, no captcha solving service needed.
+Posts realistic Chrome browser fingerprints to `api-js.datadome.co/js/` with Chrome TLS impersonation (curl_cffi). Falls back to Zendriver headless Chrome for full jspl blob bypass.
 
 ## Features
 
-- **Generic:** Works on any DataDome-protected site (auto-detects site key)
-- **No browser:** Pure HTTP — 200-400ms per cookie
-- **CH + LE support:** Challenge + Logged Events (mouse behavior simulation)
-- **TLS impersonation:** Chrome 124 via curl_cffi (no JA3 fingerprinting)
-- **Proxy support:** Works through residential/datacenter proxies
+- **Pure HTTP solver:** CH + LE cookie generation (works for main pages + tokenize endpoints)
+- **Browser fallback:** Zendriver CDP-based solver captures real DataDome cookies + full sessions
+- **Generic:** DDK auto-detection from target site
+- **curl_cffi TLS:** Chrome impersonation (no JA3 fingerprinting)
+- **harvest.py:** Generates storage-state.json session files for any engine
+
+| Feature | Status |
+|---|---|
+| DDK auto-detection | ✅ |
+| CH cookie (challenge) | ✅ |
+| LE cookie (logged events) | ✅ |
+| Main page bypass | ✅ |
+| API tokenize bypass | ✅ |
+| API submit bypass | ⚠️ Browser fallback required |
 
 ## Installation
 
 ```bash
-pip install curl_cffi
+pip install curl_cffi zendriver
+playwright install chromium  # only for browser fallback
 ```
 
-## Quick Start
+## Usage
 
 ```python
 from solver import DataDomeSolver
 
-# Auto-detect everything
-solver = DataDomeSolver(target_url="https://secure.qgiv.com/for/campaign")
-cookie = solver.solve()
-print(cookie["value"])  # Valid datadome cookie
-
-# With manual DDK
 solver = DataDomeSolver(
     target_url="https://target-site.com/page",
-    ddk="F2F61859A3070DEFFC633C1880FE37",
-    proxy="http://user:pass@host:port"
+    ddk="F2F61859A3070DEFFC633C1880FE37"  # auto-detect or manual
 )
 cookie = solver.solve()
+print(cookie["value"])  # Valid datadome cookie
 ```
 
 ## CLI
 
 ```bash
-# Auto-detect DDK
-python solver.py https://target-site.com
-
-# With manual DDK
-python solver.py https://target-site.com F2F61859A3070DEFFC633C1880FE37
-
-# Harvest sessions
-set TARGET_URL=https://target-site.com
-set HARVEST_COUNT=5
-python harvest.py
+python solver.py https://target-site.com [DDK]
 ```
 
-## How It Works
+## Architecture
 
-1. **DDK extraction:** Visits target page, extracts `hsh` from 403 `dd={}` JSON or finds `tags.js` URL
-2. **CH cookie:** Builds realistic Chrome fingerprint (screen, GPU, plugins, codecs, timezone) → POST to `api-js.datadome.co/js/` → gets datadome cookie
-3. **LE cookie:** Adds simulated mouse movement + behavior data (click counts, scroll, movement metrics) → POST again → gets validated datadome cookie
-4. **Session pairing:** Visits target site with the cookie to get matching PHPSESSID → saves as `storage-state.json`
+```
+solver.py           — Pure HTTP CH+LE cookie generation
+browser_capture.py  — Zendriver headless Chrome capture (jspl bypass)
+harvest.py          — Session harvester using solver
+```
 
 ## Credits
 
-Reverse-engineered DataDome internals from:
-- [gravilk/datadome-documented](https://github.com/gravilk/datadome-documented) — deobfuscated JS + field documentation
-- [ellisfan/bypass-datadome](https://github.com/ellisfan/bypass-datadome) — Python fingerprint builder pattern
+- [gravilk/datadome-documented](https://github.com/gravilk/datadome-documented)
+- [ellisfan/bypass-datadome](https://github.com/ellisfan/bypass-datadome)
 
 ## License
 
