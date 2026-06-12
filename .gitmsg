@@ -1,0 +1,9 @@
+v2.1: Clean fetch via iframe bypasses DataDome hooking
+
+- Use iframe.contentWindow.fetch for ALL API calls (CSRF, tokenize, submit)
+- DataDome's tags.js hooks window.fetch but iframe fetch stays clean
+- Tokenize confirmed 200 with this approach
+- Added browser checkout fallback in engine.py (submit 403 -> Zendriver checkout)
+- SAVE_CLEAN_FETCH injected before any page load via Page.addScriptToEvaluateOnNewDocument
+
+Co-authored-by: CommandCodeBot <noreply@commandcode.ai>
