@@ -28,10 +28,7 @@ from curl_cffi import requests as cffi_requests
 DD_API = "https://api-js.datadome.co/js/"
 DD_TAGS = "https://js.datadome.co/tags.js"
 
-PROXY_URL = os.environ.get(
-    "PROXY",
-    ""
-)
+PROXY_URL = os.environ.get("PROXY", "")
 
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
 IMPERSONATE = "chrome124"

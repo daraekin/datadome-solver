@@ -16,10 +16,7 @@ from datetime import datetime
 from curl_cffi import requests as cffi_requests
 from solver import DataDomeSolver, UA, IMPERSONATE
 
-PROXY_URL = os.environ.get(
-    "PROXY",
-    ""
-)
+PROXY_URL = os.environ.get("PROXY", "")
 
 TARGET_URL = os.environ.get(
     "TARGET_URL",

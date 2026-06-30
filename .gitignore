@@ -19,3 +19,6 @@ Thumbs.db
 
 # CommandCode
 .commandcode/
+
+# Environment
+.env
